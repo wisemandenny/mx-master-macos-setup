@@ -1,0 +1,23 @@
+{
+  "tap": "ctrl+up",
+  "gestures": {
+    "up": "ctrl+shift+cmd+return",
+    "down": "ctrl+shift+cmd+=",
+    "left": "ctrl+cmd+left",
+    "right": "ctrl+cmd+right"
+  },
+  "threshold": 50,
+  "button": "0x00C3",
+  "buttons": {
+    "0x00C7": "ctrl+alt+1",
+    "0x00C8": "ctrl+alt+2",
+    "0x00E0": "ctrl+alt+3",
+    "0x00E1": "ctrl+alt+4"
+  },
+  "scroll": {
+    "verticalSpeed": 1.0,
+    "horizontalSpeed": 1.0,
+    "invertHorizontal": false
+  },
+  "devices": []
+}

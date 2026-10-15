@@ -1,0 +1,125 @@
+diff --git a/Sources/thumbd/Daemon.swift b/Sources/thumbd/Daemon.swift
+index 1893f4b..fa8a27b 100644
+--- a/Sources/thumbd/Daemon.swift
++++ b/Sources/thumbd/Daemon.swift
+@@ -32,6 +32,8 @@ final class Daemon {
+         let reprog: ReprogControls
+         let wirelessStatusIndex: UInt8?
+         let button: GestureButton
++        /// False for devices without the gesture button (e.g. a keyboard): only extra buttons.
++        let hasGestureButton: Bool
+         /// Whether the main button was diverted with rawXY (gestures configured and supported).
+         let rawXY: Bool
+         /// Extra buttons diverted on this device, and the ones currently pressed.
+@@ -41,12 +43,14 @@ final class Daemon {
+         let thumbWheel: ThumbWheel?
+ 
+         init(device: HIDPPDevice, name: String, reprog: ReprogControls, wirelessStatusIndex: UInt8?,
+-             button: GestureButton, rawXY: Bool, extraButtons: [UInt16], thumbWheel: ThumbWheel?) {
++             button: GestureButton, hasGestureButton: Bool, rawXY: Bool, extraButtons: [UInt16],
++             thumbWheel: ThumbWheel?) {
+             self.device = device
+             self.name = name
+             self.reprog = reprog
+             self.wirelessStatusIndex = wirelessStatusIndex
+             self.button = button
++            self.hasGestureButton = hasGestureButton
+             self.rawXY = rawXY
+             self.extraButtons = extraButtons
+             self.thumbWheel = thumbWheel
+@@ -182,30 +186,45 @@ final class Daemon {
+                 return .incompatible
+             }
+             let controls = try reprog.controls()
+-            guard let control = controls.first(where: { $0.cid == cid }) else {
+-                Log.info("  \(name): has no control \(hex16(cid)) (see `thumbd list`)")
+-                return .incompatible
++            // Devices without the gesture button (e.g. a keyboard) are still managed when they
++            // have any of the configured extra buttons.
++            let hasExtras = bindings.extras.keys.contains { extra in
++                controls.contains { $0.cid == extra && $0.isDivertable }
+             }
+-            guard control.isDivertable else {
+-                Log.warn("  \(name): control \(hex16(cid)) can't be diverted")
+-                return .incompatible
++            let control = controls.first(where: { $0.cid == cid })
++            let hasGestureButton = control?.isDivertable ?? false
++            if !hasGestureButton {
++                if control == nil {
++                    Log.info("  \(name): has no control \(hex16(cid)) (see `thumbd list`)")
++                } else {
++                    Log.warn("  \(name): control \(hex16(cid)) can't be diverted")
++                }
++                guard hasExtras else { return .incompatible }
+             }
+             // rawXY: while the button is held, the mouse sends us its movement instead of
+             // moving the cursor. Only requested when gestures are configured.
+-            var rawXY = !bindings.swipes.isEmpty
+-            if rawXY && !control.supportsRawXY {
++            var rawXY = hasGestureButton && !bindings.swipes.isEmpty
++            if rawXY && !(control?.supportsRawXY ?? false) {
+                 Log.warn("  \(name): control \(hex16(cid)) doesn't support rawXY; tap only")
+                 rawXY = false
+             }
+-            try reprog.setReporting(for: cid, divert: true, rawXY: rawXY)
+-            let reporting = try reprog.reporting(for: cid)
+-            if !reporting.isDiverted {
+-                Log.warn("  \(name): the mouse accepted the request but reports \(reporting)")
++            var reportingSummary = "no gesture button"
++            if hasGestureButton {
++                try reprog.setReporting(for: cid, divert: true, rawXY: rawXY)
++                let reporting = try reprog.reporting(for: cid)
++                if !reporting.isDiverted {
++                    Log.warn("  \(name): the mouse accepted the request but reports \(reporting)")
++                }
++                reportingSummary = "\(reporting)"
+             }
+             var extraButtons: [UInt16] = []
+             for extra in bindings.extras.keys.sorted() {
+-                guard let info = controls.first(where: { $0.cid == extra }), info.isDivertable else {
+-                    Log.warn("  \(name): control \(hex16(extra)) doesn't exist or can't be diverted")
++                guard let info = controls.first(where: { $0.cid == extra }) else {
++                    Log.debug("  \(name): has no control \(hex16(extra))")
++                    continue
++                }
++                guard info.isDivertable else {
++                    Log.warn("  \(name): control \(hex16(extra)) can't be diverted")
+                     continue
+                 }
+                 try reprog.setReporting(for: extra, divert: true)
+@@ -216,8 +235,12 @@ final class Daemon {
+             managed[key] = Managed(device: device, name: name, reprog: reprog,
+                                    wirelessStatusIndex: wirelessStatus,
+                                    button: GestureButton(cid: cid, threshold: config.threshold),
+-                                   rawXY: rawXY, extraButtons: extraButtons, thumbWheel: thumbWheel)
+-            Log.info("✓ \(name): button \(hex16(cid)) diverted (\(reporting)): \(bindings.summary)")
++                                   hasGestureButton: hasGestureButton, rawXY: rawXY, extraButtons: extraButtons, thumbWheel: thumbWheel)
++            if hasGestureButton {
++                Log.info("✓ \(name): button \(hex16(cid)) diverted (\(reportingSummary)): \(bindings.summary)")
++            } else {
++                Log.info("✓ \(name): extra buttons diverted: \(extraButtons.map(hex16).joined(separator: ", "))")
++            }
+             return .managed
+         } catch {
+             Log.error("  error configuring device #\(hex8(device.index)): \(error) (will retry)")
+@@ -274,7 +297,8 @@ final class Daemon {
+             defer { m.device.timeout = timeout }
+             do {
+                 // One request: if the device reset, every diversion is gone together.
+-                let reporting = try m.reprog.reporting(for: config.button)
++                guard let probe = m.hasGestureButton ? config.button : m.extraButtons.first else { continue }
++                let reporting = try m.reprog.reporting(for: probe)
+                 guard !reporting.isDiverted || (m.rawXY && !reporting.isRawXYDiverted) else { continue }
+                 Log.info("\(m.name): diversion lost (\(reporting)) [\(reason)]; diverting again")
+                 m.button.reset()
+@@ -414,7 +438,9 @@ final class Daemon {
+         for m in managed.values {
+             m.device.timeout = 1.0
+             do {
+-                try m.reprog.setReporting(for: config.button, divert: false, rawXY: false)
++                if m.hasGestureButton {
++                    try m.reprog.setReporting(for: config.button, divert: false, rawXY: false)
++                }
+                 for cid in m.extraButtons {
+                     try m.reprog.setReporting(for: cid, divert: false)
+                 }
