@@ -162,15 +162,24 @@ setup_rectangle() {
   fi
   # Key codes: 1=18, 2=19, 3=20, 4=21. Modifier flags: Control (1<<18) + Option (1<<19).
   local ctrl_opt=786432
+  # "Recommended" preset (vs. Spectacle's); setting it before first launch skips the picker.
+  defaults write com.knollsoft.Rectangle alternateDefaultShortcuts -bool true
+  defaults write com.knollsoft.Rectangle launchOnLogin -bool true
   defaults write com.knollsoft.Rectangle firstThird        -dict keyCode -int 18 modifierFlags -int $ctrl_opt
   defaults write com.knollsoft.Rectangle firstTwoThirds    -dict keyCode -int 19 modifierFlags -int $ctrl_opt
   defaults write com.knollsoft.Rectangle firstThreeFourths -dict keyCode -int 20 modifierFlags -int $ctrl_opt
   defaults write com.knollsoft.Rectangle firstFourth       -dict keyCode -int 21 modifierFlags -int $ctrl_opt
+  # Every other action the "Recommended" preset binds by default. An empty dict is Rectangle's
+  # own "no shortcut" value (confirmed by clearing one by hand in the app and reading it back).
+  for action in leftHalf rightHalf maximize maximizeHeight previousDisplay nextDisplay \
+                larger smaller bottomHalf topHalf center bottomLeft bottomRight topLeft topRight \
+                restore centerThird lastTwoThirds lastThird secondFourth thirdFourth lastFourth; do
+    defaults write com.knollsoft.Rectangle "$action" -dict
+  done
   good "First Third ⌃⌥1, First Two Thirds ⌃⌥2, First Three Fourths ⌃⌥3, First Fourth ⌃⌥4"
+  good "Every other default shortcut cleared, and Launch on login turned on"
   open "$app"
-  info "Rectangle is open. If it asks, allow Accessibility and pick either default shortcut set."
-  info "Then, in Rectangle's settings: check the four shortcuts above, turn on 'Launch on login',"
-  info "and clear any other shortcuts you don't use."
+  info "Rectangle is open. If it asks, allow its Accessibility permission."
   pause "When Rectangle is set up,"
 }
 

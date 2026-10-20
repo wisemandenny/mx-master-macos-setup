@@ -53,7 +53,7 @@ The script installs Rectangle if it isn't there (into Applications, or the Appli
 | First Three Fourths | Ctrl+Opt+3 |
 | First Fourth | Ctrl+Opt+4 |
 
-When Rectangle opens, allow its Accessibility permission. Then, in Rectangle's settings, confirm the four shortcuts above, turn on **Launch on login**, and clear any other shortcuts you don't use.
+It also turns on **Launch on login** and clears every other shortcut from Rectangle's "Recommended" default set, so only the four above are active — no manual entry needed. When Rectangle opens, just allow its Accessibility permission.
 
 ### 3. macOS window shortcuts (by hand)
 
