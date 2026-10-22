@@ -1,6 +1,6 @@
 # MX Master 3 + MX Keys + Brio setup without Logitech's apps
 
-This folder sets up an MX Master 3, MX Keys and Brio webcam on a new Mac the way they work now: a working scroll wheel, gestures on the mouse's gesture button, custom F1–F4 keys, window shortcuts through Rectangle and macOS, and the webcam's field of view, zoom and pan. Logi Options+ isn't used, because on recent macOS it takes over the scroll wheel and stops it from working. Logi Tune isn't used either, because it overrides the webcam framing whenever an app opens the camera.
+This folder sets up an MX Master 3, MX Keys and Brio webcam on a new Mac the way they work now: a working scroll wheel tuned with Mos, gestures on the mouse's gesture button, custom F1–F4 keys, window shortcuts through Rectangle and macOS, and the webcam's field of view, zoom and pan. Logi Options+ isn't used, because on recent macOS it takes over the scroll wheel and stops it from working. Logi Tune isn't used either, because it overrides the webcam framing whenever an app opens the camera.
 
 ## What's in this folder
 
@@ -28,7 +28,7 @@ Open Terminal in this folder and run:
 ./setup.sh
 ```
 
-It runs five steps in order and pauses whenever you need to do something by hand. To run just some of them, name them, for example `./setup.sh brio alias`. The steps are `thumbd`, `rectangle`, `macos`, `brio`, `alias`, plus `check`, which only checks that thumbd is working.
+It runs six steps in order and pauses whenever you need to do something by hand. To run just some of them, name them, for example `./setup.sh brio alias`. The steps are `thumbd`, `mos`, `rectangle`, `macos`, `brio`, `alias`, plus `check`, which only checks that thumbd is working.
 
 ### 1. thumbd
 
@@ -43,7 +43,22 @@ This is needed after every build, because macOS ties permissions to the exact bu
 
 Finally the script checks thumbd's log. You should see one line saying the mouse is set up and one saying the keyboard is.
 
-### 2. Rectangle
+### 2. Mos
+
+[Mos](https://github.com/Caldis/Mos) is the only way to adjust the mouse's scroll wheel without Logi Options+. The script installs it if it isn't there (into Applications, or the Applications folder in your home folder without admin rights), then sets these and leaves everything else at Mos's defaults:
+
+| Mos setting | Value |
+| --- | --- |
+| Smooth scrolling | Off |
+| Reverse | Off |
+| Scroll hotkeys (Option, Shift, Command) | None |
+| Step | 7.61 |
+| Speed | 1.00 |
+| Duration | 3.99 |
+
+If Mos has never run, the script opens it once first, because on its first launch Mos saves its defaults over any existing settings. When Mos opens, allow its Accessibility permission. To check the values, click the Mos menu bar icon and go to **Preferences > Scrolling**. To use different values, change the `MOS_` lines at the top of `setup.sh` and run `./setup.sh mos` again.
+
+### 3. Rectangle
 
 The script installs Rectangle if it isn't there (into Applications, or the Applications folder in your home folder without admin rights) and sets these shortcuts:
 
@@ -56,7 +71,7 @@ The script installs Rectangle if it isn't there (into Applications, or the Appli
 
 It also turns on **Launch on login** and clears every other shortcut from Rectangle's "Recommended" default set, so only the four above are active — no manual entry needed. When Rectangle opens, just allow its Accessibility permission.
 
-### 3. macOS window shortcuts (by hand)
+### 4. macOS window shortcuts (by hand)
 
 macOS doesn't offer a reliable way to set these from a script, so the script opens Keyboard settings and waits. Go to **System Settings > Keyboard > Keyboard Shortcuts… > Windows**, turn off every shortcut, then turn on and set only these:
 
@@ -69,13 +84,13 @@ macOS doesn't offer a reliable way to set these from a script, so the script ope
 
 To change a shortcut, double-click it and press the new keys. Leave **Mission Control** (Ctrl+Up, in the Mission Control section) turned on, since it's the gesture button's tap.
 
-### 4. Brio webcam
+### 5. Brio webcam
 
 The script downloads [uvc-util](https://github.com/jtfrey/uvc-util) into `~/src/uvc-util` (set `UVC_UTIL_DIR` to use another folder), switches to the version the patch was written for (commit `8110da7`), applies the patch, builds it, and installs it to `~/.local/bin/uvc-util`. The build takes a few seconds and needs no permissions.
 
 Then, if the Brio is plugged in, it applies the framing: field of view 78°, zoom 135, pan 7200 and tilt -25200. The camera remembers these between apps, so nothing needs to run in the background. If the Brio isn't plugged in, plug it in and run `./setup.sh brio` again, or use the `brio-frame` alias from the next step.
 
-### 5. Shell aliases
+### 6. Shell aliases
 
 The script adds these to `~/.zshrc`:
 
@@ -144,6 +159,8 @@ When the framing looks right, update `BRIO_FRAME_CMD` in `setup.sh` and the `bri
 **The Mac beeps when a gesture or key fires.** Nothing is set to that shortcut. Check the macOS and Rectangle shortcuts above.
 
 **The scroll wheel stops working.** Something is taking over the wheel, usually Logi Options+. Check that it isn't installed or running.
+
+**Scrolling feels wrong (too fast, smoothed, or reversed).** Check that Mos is running and has its Accessibility permission, then run `./setup.sh mos` to put its settings back.
 
 **Updating thumbd.** The patch only applies cleanly to commit `4cb87d4`. If you pull a newer version, the patch may need updating. Each rebuild also means granting the permissions again.
 

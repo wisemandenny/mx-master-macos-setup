@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Sets up an MX Master 3 + MX Keys on macOS without Logi Options+:
 #   - thumbd (patched): gesture button gestures, and F1–F4 on the keyboard
+#   - Mos: scroll wheel settings (smooth scrolling and reverse off)
 #   - Rectangle: thirds/fourths shortcuts
 #   - macOS window tiling shortcuts (guided, manual)
 #   - Logitech Brio webcam framing (FoV, zoom, pan) via a patched uvc-util
@@ -8,7 +9,7 @@
 #
 # Usage:
 #   ./setup.sh                 run every step
-#   ./setup.sh thumbd alias    run only some steps: thumbd, rectangle, macos, brio, alias, check
+#   ./setup.sh thumbd alias    run only some steps: thumbd, mos, rectangle, macos, brio, alias, check
 #
 # Every step is safe to run again. No admin rights needed (except for the Command Line
 # Tools, if they're not installed yet).
@@ -24,6 +25,11 @@ CONFIG_DIR="$HOME/.config/thumbd"
 PANE_INPUT="x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 PANE_ACCESS="x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 PANE_KEYBOARD="x-apple.systempreferences:com.apple.Keyboard-Settings.extension"
+MOS_SMOOTH=false
+MOS_REVERSE=false
+MOS_STEP=7.61
+MOS_SPEED=1.00
+MOS_DURATION=3.99
 UVC_UTIL_DIR="${UVC_UTIL_DIR:-$HOME/src/uvc-util}"
 UVC_UTIL_REPO="https://github.com/jtfrey/uvc-util.git"
 UVC_UTIL_COMMIT="8110da7"   # the FoV patch was written against this commit
@@ -38,7 +44,7 @@ warn()  { printf '   \033[33m! %s\033[0m\n' "$*"; }
 good()  { printf '   \033[32m✓ %s\033[0m\n' "$*"; }
 pause() { read -r -p "   $* Press Return to continue… " _; }
 
-usage() { sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # ---------------------------------------------------------------- thumbd
 
@@ -129,6 +135,68 @@ check_thumbd() {
   else
     warn "The keyboard isn't set up yet. Make sure it's connected, then run: ./setup.sh check"
   fi
+}
+
+# ---------------------------------------------------------------- Mos
+
+setup_mos() {
+  bold "Mos: app"
+  local app=""
+  for d in /Applications "$HOME/Applications"; do
+    if [ -d "$d/Mos.app" ]; then app="$d/Mos.app"; fi
+  done
+  if [ -n "$app" ]; then
+    good "Already installed: $app"
+  else
+    local dest="/Applications"
+    [ -w "$dest" ] || dest="$HOME/Applications"
+    mkdir -p "$dest"
+    local url
+    url="$(curl -fsSL https://api.github.com/repos/Caldis/Mos/releases/latest \
+      | grep -o '"browser_download_url": *"[^"]*\.zip"' | head -n 1 | cut -d'"' -f4)"
+    if [ -z "$url" ]; then
+      warn "Couldn't find the Mos download. Install it from mos.caldis.me, then run: ./setup.sh mos"
+      exit 1
+    fi
+    local tmp; tmp="$(mktemp -d)"
+    info "Downloading $url"
+    curl -fsSL -o "$tmp/Mos.zip" "$url"
+    ditto -x -k "$tmp/Mos.zip" "$tmp/unzipped"
+    cp -R "$(find "$tmp/unzipped" -maxdepth 2 -name Mos.app -type d | head -n 1)" "$dest/"
+    rm -rf "$tmp"
+    app="$dest/Mos.app"
+    good "Installed $app"
+  fi
+
+  bold "Mos: scroll settings"
+  # Without optionsExist, Mos's first launch saves its defaults over anything written here.
+  if ! defaults read com.caldis.Mos optionsExist >/dev/null 2>&1; then
+    info "Opening Mos once so it creates its settings…"
+    open "$app"
+    for _ in $(seq 1 20); do
+      defaults read com.caldis.Mos optionsExist >/dev/null 2>&1 && break
+      sleep 1
+    done
+  fi
+  if pgrep -xq Mos; then
+    osascript -e 'tell application "Mos" to quit' >/dev/null 2>&1 || true
+    sleep 2
+  fi
+  defaults write com.caldis.Mos optionsExist -string optionsExist
+  defaults write com.caldis.Mos smooth   -bool  "$MOS_SMOOTH"
+  defaults write com.caldis.Mos reverse  -bool  "$MOS_REVERSE"
+  defaults write com.caldis.Mos step     -float "$MOS_STEP"
+  defaults write com.caldis.Mos speed    -float "$MOS_SPEED"
+  defaults write com.caldis.Mos duration -float "$MOS_DURATION"
+  # Once optionsExist is set, Mos reads a missing hotkey as "none"; this clears the Option/Shift/Cmd defaults.
+  for key in dash toggle block; do
+    defaults delete com.caldis.Mos "$key" >/dev/null 2>&1 || true
+  done
+  good "Smooth scrolling off, reverse off, no scroll hotkeys, step $MOS_STEP, speed $MOS_SPEED, duration $MOS_DURATION"
+  open "$app"
+  info "Mos is open. If it asks, allow its Accessibility permission."
+  info "To check the settings, click the Mos menu bar icon > Preferences > Scrolling."
+  pause "When Mos is set up,"
 }
 
 # ---------------------------------------------------------------- Rectangle
@@ -283,10 +351,11 @@ EOF
 
 # ---------------------------------------------------------------- main
 
-if [ $# -eq 0 ]; then set -- thumbd rectangle macos brio alias; fi
+if [ $# -eq 0 ]; then set -- thumbd mos rectangle macos brio alias; fi
 for step in "$@"; do
   case "$step" in
     thumbd)    setup_thumbd ;;
+    mos)       setup_mos ;;
     rectangle) setup_rectangle ;;
     macos)     setup_macos ;;
     brio)      setup_brio ;;
