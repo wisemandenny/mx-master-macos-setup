@@ -1,0 +1,90 @@
+diff --git a/src/UVCController.h b/src/UVCController.h
+index 73895f2..0b4774e 100644
+--- a/src/UVCController.h
++++ b/src/UVCController.h
+@@ -398,3 +398,8 @@ FOUNDATION_EXPORT NSString *UVCProcessingUnitControlAutoHue;
+ FOUNDATION_EXPORT NSString *UVCProcessingUnitControlAnalogVideoStandard;
+ FOUNDATION_EXPORT NSString *UVCProcessingUnitControlAnalogLockStatus;
+ FOUNDATION_EXPORT NSString *UVCProcessingUnitControlAutoContrast;
++
++//
++// Control names, Logitech video extension unit
++//
++FOUNDATION_EXPORT NSString *UVCLogitechControlFieldOfView;
+diff --git a/src/UVCController.m b/src/UVCController.m
+index 41e5054..1cf1f4b 100644
+--- a/src/UVCController.m
++++ b/src/UVCController.m
+@@ -26,6 +26,11 @@
+ #define VC_PROCESSING_UNIT      0x05
+ #define VC_EXTENSION_UNIT       0x06
+ 
++// Logitech video XU {49E40215-F434-47FE-B158-0E885023E51B}; unit id is discovered from the descriptor
++#define LOGITECH_VIDEO_XU_ID      0
++#define LOGITECH_XU_FOV_CONTROL   0x05
++static const uint8_t LogitechVideoXUGUID[16] = { 0x15, 0x02, 0xe4, 0x49, 0x34, 0xf4, 0xfe, 0x47, 0xb1, 0x58, 0x0e, 0x88, 0x50, 0x23, 0xe5, 0x1b };
++
+ // On newer versions of Mac OS X, the kIOMasterPortDefault enum has been
+ // replaced by kIOMainPortDefault.
+ #if (MAC_OS_X_VERSION_MAX_ALLOWED < 120000) // Before macOS 12 Monterey
+@@ -333,7 +338,9 @@ to the (little endian) USB-native value.
+                       UVC_CONTROL_INIT(UVC_PROCESSING_UNIT_ID, PU_HUE_AUTO_CONTROL,"{B}"),
+                       UVC_CONTROL_INIT(UVC_PROCESSING_UNIT_ID, PU_ANALOG_VIDEO_STANDARD_CONTROL, "{U1}"),
+                       UVC_CONTROL_INIT(UVC_PROCESSING_UNIT_ID, PU_ANALOG_LOCK_STATUS_CONTROL, "{U1}"),
+-                      UVC_CONTROL_INIT(UVC_PROCESSING_UNIT_ID, PU_CONTRAST_AUTO_CONTROL, "{U1}")
++                      UVC_CONTROL_INIT(UVC_PROCESSING_UNIT_ID, PU_CONTRAST_AUTO_CONTROL, "{U1}"),
++                      //
++                      UVC_CONTROL_INIT(LOGITECH_VIDEO_XU_ID, LOGITECH_XU_FOV_CONTROL, "{U1}")
+                     };
+ 
+ /*!
+@@ -592,6 +599,7 @@ + (NSDictionary*) controlMapping
+                                   [NSNumber numberWithInt:36], UVCProcessingUnitControlAnalogVideoStandard,
+                                   [NSNumber numberWithInt:37], UVCProcessingUnitControlAnalogLockStatus,
+                                   [NSNumber numberWithInt:38], UVCProcessingUnitControlAutoContrast,
++                                  [NSNumber numberWithInt:39], UVCLogitechControlFieldOfView,
+                                   nil
+                                 ];
+     }
+@@ -705,6 +713,9 @@ - (BOOL) controlIsNotAvailable:(NSString*)controlString
+     if ( controlIndex != UVCInvalidControlIndex ) {
+       switch ( UVCControllerControls[controlIndex].unitType ) {
+ 
++        case LOGITECH_VIDEO_XU_ID:
++          return ([_unitIds objectForKey:@"LOGITECH_VIDEO_XU_ID"] == nil);
++
+         case UVC_INPUT_TERMINAL_ID: {
+           // If we weren't able to get control enablement from the interface
+           // descriptor, don't prevent the code from TRYING to access the
+@@ -908,6 +919,16 @@ - (BOOL) findControllerInterfaceForServiceObject:(io_service_t)ioServiceObject
+                   break;
+                 }
+ 
++                case VC_EXTENSION_UNIT: {
++                  uint8_t                             *xu = (uint8_t*)basePtr;
++
++                  // bUnitID at offset 3, guidExtensionCode at offset 4
++                  if ( descriptorPrefix->bLength >= 20 && memcmp(xu + 4, LogitechVideoXUGUID, 16) == 0 ) {
++                    [_unitIds setObject:[NSNumber numberWithInt:xu[3]] forKey:@"LOGITECH_VIDEO_XU_ID"];
++                  }
++                  break;
++                }
++
+               }
+             }
+             basePtr += descriptorPrefix->bLength;
+@@ -986,6 +1007,7 @@ - (BOOL) capabilities:(NSUInteger*)capabilities
+     uvc_control_t           *control = &UVCControllerControls[controlId];
+     uint8_t                 scratch;
+ 
++    if ( ! [_unitIds objectForKey:control->unitTypeStr] ) return NO;
+     if ( [self getData:&scratch ofType:UVC_GET_INFO withLength:1 fromSelector:control->selector atUnitId:[[_unitIds objectForKey:control->unitTypeStr] intValue]] ) {
+       *capabilities = scratch;
+       return YES;
+@@ -1589,3 +1611,6 @@ - (NSString*) summaryString
+ NSString *UVCProcessingUnitControlAnalogLockStatus = @"analog-lock-status";
+ NSString *UVCProcessingUnitControlAutoContrast = @"auto-contrast";
+ 
++//
++
++NSString *UVCLogitechControlFieldOfView = @"logitech-fov";

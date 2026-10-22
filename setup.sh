@@ -3,11 +3,12 @@
 #   - thumbd (patched): gesture button gestures, and F1–F4 on the keyboard
 #   - Rectangle: thirds/fourths shortcuts
 #   - macOS window tiling shortcuts (guided, manual)
-#   - the thumbd-restart shell alias
+#   - Logitech Brio webcam framing (FoV, zoom, pan) via a patched uvc-util
+#   - the thumbd-restart and brio-frame shell aliases
 #
 # Usage:
 #   ./setup.sh                 run every step
-#   ./setup.sh thumbd alias    run only some steps: thumbd, rectangle, macos, alias, check
+#   ./setup.sh thumbd alias    run only some steps: thumbd, rectangle, macos, brio, alias, check
 #
 # Every step is safe to run again. No admin rights needed (except for the Command Line
 # Tools, if they're not installed yet).
@@ -23,6 +24,13 @@ CONFIG_DIR="$HOME/.config/thumbd"
 PANE_INPUT="x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 PANE_ACCESS="x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 PANE_KEYBOARD="x-apple.systempreferences:com.apple.Keyboard-Settings.extension"
+UVC_UTIL_DIR="${UVC_UTIL_DIR:-$HOME/src/uvc-util}"
+UVC_UTIL_REPO="https://github.com/jtfrey/uvc-util.git"
+UVC_UTIL_COMMIT="8110da7"   # the FoV patch was written against this commit
+UVC_UTIL_BIN="$HOME/.local/bin/uvc-util"
+BRIO_ID="0x046d:0x085e"
+# FoV: 0 = 90°, 1 = 78°, 2 = 65°. Pan/tilt step is 3600; positive pan = right, positive tilt = up.
+BRIO_FRAME_CMD='~/.local/bin/uvc-util -V 0x046d:0x085e -s logitech-fov=1 -s zoom-abs=135 -s "pan-tilt-abs={pan=7200,tilt=-25200}"'
 
 bold()  { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 info()  { printf '   %s\n' "$*"; }
@@ -30,13 +38,13 @@ warn()  { printf '   \033[33m! %s\033[0m\n' "$*"; }
 good()  { printf '   \033[32m✓ %s\033[0m\n' "$*"; }
 pause() { read -r -p "   $* Press Return to continue… " _; }
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # ---------------------------------------------------------------- thumbd
 
 check_tools() {
   if ! xcode-select -p >/dev/null 2>&1; then
-    warn "The Command Line Tools (needed to build thumbd) aren't installed. Opening the installer…"
+    warn "The Command Line Tools (needed to build thumbd and uvc-util) aren't installed. Opening the installer…"
     xcode-select --install || true
     warn "Run ./setup.sh again when the installation has finished."
     exit 1
@@ -201,6 +209,55 @@ setup_macos() {
   pause "When the shortcuts are set,"
 }
 
+# ---------------------------------------------------------------- Brio webcam
+
+setup_brio() {
+  bold "Brio: uvc-util source code"
+  check_tools
+  if [ -d "$UVC_UTIL_DIR/.git" ]; then
+    info "Using the existing clone at $UVC_UTIL_DIR"
+  else
+    mkdir -p "$(dirname "$UVC_UTIL_DIR")"
+    git clone --quiet "$UVC_UTIL_REPO" "$UVC_UTIL_DIR"
+    info "Cloned into $UVC_UTIL_DIR"
+  fi
+  cd "$UVC_UTIL_DIR"
+  if git apply --reverse --check "$HERE/uvc-util-logitech-fov.patch" 2>/dev/null; then
+    good "FoV patch already applied"
+  else
+    if [ -n "$(git status --porcelain)" ]; then
+      warn "$UVC_UTIL_DIR has local changes. Commit, stash or delete them, then run again."
+      exit 1
+    fi
+    git fetch --quiet origin
+    git -c advice.detachedHead=false checkout --quiet "$UVC_UTIL_COMMIT"
+    git apply "$HERE/uvc-util-logitech-fov.patch"
+    good "Applied the FoV patch on commit $UVC_UTIL_COMMIT"
+  fi
+
+  bold "Brio: build and install uvc-util"
+  local out; out="$(mktemp)"
+  if ! (cd src && gcc -o uvc-util -framework IOKit -framework Foundation \
+          uvc-util.m UVCController.m UVCType.m UVCValue.m) >"$out" 2>&1; then
+    cat "$out"
+    warn "The build failed; see the output above."
+    exit 1
+  fi
+  rm -f "$out"
+  mkdir -p "$(dirname "$UVC_UTIL_BIN")"
+  cp src/uvc-util "$UVC_UTIL_BIN"
+  good "Installed $UVC_UTIL_BIN"
+
+  bold "Brio: framing"
+  if "$UVC_UTIL_BIN" -V "$BRIO_ID" -g zoom-abs >/dev/null 2>&1; then
+    eval "$BRIO_FRAME_CMD"
+    "$UVC_UTIL_BIN" -V "$BRIO_ID" -g logitech-fov -g zoom-abs -g pan-tilt-abs | sed 's/^/   /'
+    good "Applied FoV 78°, zoom 135 and pan/tilt; the camera keeps them between apps"
+  else
+    warn "No Brio found. Plug it in, then run: ./setup.sh brio"
+  fi
+}
+
 # ---------------------------------------------------------------- alias
 
 setup_alias() {
@@ -216,16 +273,23 @@ alias thumbd-restart="~/.local/bin/thumbd check-config && launchctl kickstart -k
 EOF
     good "Added thumbd-restart to $rc (open a new Terminal window to use it)"
   fi
+  if grep -q 'alias brio-frame=' "$rc" 2>/dev/null; then
+    good "brio-frame is already in $rc"
+  else
+    printf '\n# Re-apply the Brio webcam framing (FoV 78°, zoom, pan/tilt)\nalias brio-frame='\''%s'\''\n' "$BRIO_FRAME_CMD" >> "$rc"
+    good "Added brio-frame to $rc (open a new Terminal window to use it)"
+  fi
 }
 
 # ---------------------------------------------------------------- main
 
-if [ $# -eq 0 ]; then set -- thumbd rectangle macos alias; fi
+if [ $# -eq 0 ]; then set -- thumbd rectangle macos brio alias; fi
 for step in "$@"; do
   case "$step" in
     thumbd)    setup_thumbd ;;
     rectangle) setup_rectangle ;;
     macos)     setup_macos ;;
+    brio)      setup_brio ;;
     alias)     setup_alias ;;
     check)     check_thumbd ;;
     -h|--help) usage; exit 0 ;;
@@ -236,3 +300,4 @@ done
 bold "Done"
 info "Keyboard: keep the top row in media mode (Fn lock off, toggled with Fn+Esc)."
 info "Don't install Logi Options+: it breaks the scroll wheel on this setup."
+info "Don't install Logi Tune: it overrides the Brio framing set here."
