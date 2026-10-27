@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sets up an MX Master 3 + MX Keys on macOS without Logi Options+:
 #   - thumbd (patched): gesture button gestures, and F1–F4 on the keyboard
-#   - Mos: scroll wheel settings (smooth scrolling and reverse off)
+#   - Mos: scroll wheel settings (seamless scrolling on, wheel direction not inverted)
 #   - Rectangle: thirds/fourths shortcuts
 #   - macOS window tiling shortcuts (guided, manual)
 #   - Logitech Brio webcam framing (FoV, zoom, pan) via a patched uvc-util
@@ -25,11 +25,11 @@ CONFIG_DIR="$HOME/.config/thumbd"
 PANE_INPUT="x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
 PANE_ACCESS="x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 PANE_KEYBOARD="x-apple.systempreferences:com.apple.Keyboard-Settings.extension"
-MOS_SMOOTH=false
+MOS_SMOOTH=true
 MOS_REVERSE=false
-MOS_STEP=7.61
-MOS_SPEED=1.00
-MOS_DURATION=3.99
+MOS_STEP=33.60
+MOS_SPEED=2.70
+MOS_DURATION=4.35
 UVC_UTIL_DIR="${UVC_UTIL_DIR:-$HOME/src/uvc-util}"
 UVC_UTIL_REPO="https://github.com/jtfrey/uvc-util.git"
 UVC_UTIL_COMMIT="8110da7"   # the FoV patch was written against this commit
@@ -192,7 +192,7 @@ setup_mos() {
   for key in dash toggle block; do
     defaults delete com.caldis.Mos "$key" >/dev/null 2>&1 || true
   done
-  good "Smooth scrolling off, reverse off, no scroll hotkeys, step $MOS_STEP, speed $MOS_SPEED, duration $MOS_DURATION"
+  good "Seamless scrolling on, wheel direction not inverted, dash/toggle/block keys off, step $MOS_STEP, speed $MOS_SPEED, duration $MOS_DURATION"
   open "$app"
   info "Mos is open. If it asks, allow its Accessibility permission."
   info "To check the settings, click the Mos menu bar icon > Preferences > Scrolling."

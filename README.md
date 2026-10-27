@@ -49,12 +49,12 @@ Finally the script checks thumbd's log. You should see one line saying the mouse
 
 | Mos setting | Value |
 | --- | --- |
-| Smooth scrolling | Off |
-| Reverse | Off |
-| Scroll hotkeys (Option, Shift, Command) | None |
-| Step | 7.61 |
-| Speed | 1.00 |
-| Duration | 3.99 |
+| Enable seamless scrolling | On |
+| Invert wheel direction | Off |
+| Dash, Toggle and Block keys | Off |
+| Step | 33.60 |
+| Speed | 2.70 |
+| Duration | 4.35 |
 
 If Mos has never run, the script opens it once first, because on its first launch Mos saves its defaults over any existing settings. When Mos opens, allow its Accessibility permission. To check the values, click the Mos menu bar icon and go to **Preferences > Scrolling**. To use different values, change the `MOS_` lines at the top of `setup.sh` and run `./setup.sh mos` again.
 
@@ -160,7 +160,7 @@ When the framing looks right, update `BRIO_FRAME_CMD` in `setup.sh` and the `bri
 
 **The scroll wheel stops working.** Something is taking over the wheel, usually Logi Options+. Check that it isn't installed or running.
 
-**Scrolling feels wrong (too fast, smoothed, or reversed).** Check that Mos is running and has its Accessibility permission, then run `./setup.sh mos` to put its settings back.
+**Scrolling feels wrong (wrong speed, not smooth, or reversed).** Check that Mos is running and has its Accessibility permission, then run `./setup.sh mos` to put its settings back.
 
 **Updating thumbd.** The patch only applies cleanly to commit `4cb87d4`. If you pull a newer version, the patch may need updating. Each rebuild also means granting the permissions again.
 
