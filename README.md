@@ -56,7 +56,20 @@ Finally the script checks thumbd's log. You should see one line saying the mouse
 | Speed | 2.70 |
 | Duration | 4.35 |
 
-If Mos has never run, the script opens it once first, because on its first launch Mos saves its defaults over any existing settings. When Mos opens, allow its Accessibility permission. To check the values, click the Mos menu bar icon and go to **Preferences > Scrolling**. To use different values, change the `MOS_` lines at the top of `setup.sh` and run `./setup.sh mos` again.
+It also adds an exception for iTerm2 (at `/Applications/iTerm.app`), where scrolling needed its own tuning. iTerm2 doesn't follow the settings above. It uses these instead:
+
+| Mos setting (iTerm2) | Value |
+| --- | --- |
+| Enable seamless scrolling | On |
+| Invert wheel direction | Off |
+| Dash, Toggle and Block keys | Off |
+| Step | 10.17 |
+| Speed | 2.70 |
+| Duration | 1.82 |
+
+This replaces any other Mos exceptions you've added.
+
+If Mos has never run, the script opens it once first, because on its first launch Mos saves its defaults over any existing settings. When Mos opens, allow its Accessibility permission. To check the values, click the Mos menu bar icon and go to **Preferences > Scrolling**, and **Preferences > Exceptions** for iTerm2. To use different values, change the `MOS_` lines at the top of `setup.sh` and run `./setup.sh mos` again.
 
 ### 3. Rectangle
 

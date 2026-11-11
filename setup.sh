@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sets up an MX Master 3 + MX Keys on macOS without Logi Options+:
 #   - thumbd (patched): gesture button gestures, and F1–F4 on the keyboard
-#   - Mos: scroll wheel settings (seamless scrolling on, wheel direction not inverted)
+#   - Mos: scroll wheel settings (seamless scrolling on, wheel direction not inverted), plus an iTerm2 exception
 #   - Rectangle: thirds/fourths shortcuts
 #   - macOS window tiling shortcuts (guided, manual)
 #   - Logitech Brio webcam framing (FoV, zoom, pan) via a patched uvc-util
@@ -30,6 +30,9 @@ MOS_REVERSE=false
 MOS_STEP=33.60
 MOS_SPEED=2.70
 MOS_DURATION=4.35
+MOS_ITERM_PATH="/Applications/iTerm.app/Contents/MacOS/iTerm2"
+MOS_ITERM_STEP=10.17
+MOS_ITERM_DURATION=1.82
 UVC_UTIL_DIR="${UVC_UTIL_DIR:-$HOME/src/uvc-util}"
 UVC_UTIL_REPO="https://github.com/jtfrey/uvc-util.git"
 UVC_UTIL_COMMIT="8110da7"   # the FoV patch was written against this commit
@@ -193,6 +196,16 @@ setup_mos() {
     defaults delete com.caldis.Mos "$key" >/dev/null 2>&1 || true
   done
   good "Seamless scrolling on, wheel direction not inverted, dash/toggle/block keys off, step $MOS_STEP, speed $MOS_SPEED, duration $MOS_DURATION"
+
+  bold "Mos: iTerm2 exception"
+  # Mos stores per-app exceptions as a JSON blob; this replaces any existing exceptions.
+  local exceptions
+  exceptions="$(cat <<EOF
+[{"displayName":"","inherit":false,"path":"$MOS_ITERM_PATH","scroll":{"smooth":$MOS_SMOOTH,"smoothVertical":true,"smoothHorizontal":true,"smoothSimTrackpad":false,"reverse":$MOS_REVERSE,"reverseVertical":true,"reverseHorizontal":true,"step":$MOS_ITERM_STEP,"speed":$MOS_SPEED,"duration":$MOS_ITERM_DURATION,"deadZone":1}}]
+EOF
+)"
+  defaults write com.caldis.Mos applications -data "$(printf '%s' "$exceptions" | xxd -p | tr -d '\n')"
+  good "iTerm2: own settings, step $MOS_ITERM_STEP, duration $MOS_ITERM_DURATION"
   open "$app"
   info "Mos is open. If it asks, allow its Accessibility permission."
   info "To check the settings, click the Mos menu bar icon > Preferences > Scrolling."
